@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="IFAC 2026">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <title>IFAC 2026 Pocket Program</title>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="eyebrow">BUSAN · AUG 24–28</div>
+      <h1>IFAC 2026</h1>
+    </div>
+    <button id="syncBtn" class="icon-btn" aria-label="Sync program">↻</button>
+  </header>
+
+  <main>
+    <section class="search-card">
+      <input id="search" type="search" placeholder="Search title, author, keyword, room…" autocomplete="off">
+      <div class="filters">
+        <select id="dayFilter" aria-label="Day">
+          <option value="">All days</option>
+        </select>
+        <select id="typeFilter" aria-label="Session type">
+          <option value="">All types</option>
+        </select>
+        <button id="favoritesOnly" class="chip" aria-pressed="false">★ My program</button>
+      </div>
+      <div id="status" class="status">No program loaded.</div>
+    </section>
+
+    <section id="results" class="results" aria-live="polite"></section>
+  </main>
+
+  <nav>
+    <button data-view="browse" class="active">Browse</button>
+    <button data-view="agenda">Agenda</button>
+    <button data-view="about">About</button>
+  </nav>
+
+  <dialog id="detailDialog">
+    <button id="closeDialog" class="close">×</button>
+    <div id="detailContent"></div>
+  </dialog>
+
+  <template id="cardTemplate">
+    <article class="card">
+      <button class="fav" aria-label="Toggle favorite">☆</button>
+      <div class="time"></div>
+      <div class="meta"></div>
+      <h2></h2>
+      <div class="authors"></div>
+      <div class="keywords"></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
