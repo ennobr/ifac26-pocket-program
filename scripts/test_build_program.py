@@ -33,6 +33,11 @@ Researcher, Robin\tResearch Institute
         program = json.loads(program_path.read_text(encoding="utf-8"))
         self.assertEqual(program["schemaVersion"], 2)
         self.assertEqual(len(program["days"]), 5)
+        expected_prefixes = ["Mo", "Tu", "We", "Th", "Fr"]
+        for day, prefix in zip(program["days"], expected_prefixes):
+            self.assertTrue(all(session["code"].startswith(prefix) for session in day["sessions"]))
+            starts = [session["start"] or "99:99" for session in day["sessions"]]
+            self.assertEqual(starts, sorted(starts))
         paper_codes = [
             paper["code"]
             for day in program["days"]
@@ -45,10 +50,10 @@ Researcher, Robin\tResearch Institute
     def test_keeps_program_items_without_papers(self):
         text = """
 MoC11  Tutorial Session, Room 201\tAdd to My Program
-Back-To-Basics Tutorial
+Kwon Special Session
 Chair: Example, Ada\tExample University
 MoC12  Forum, Room 205\tAdd to My Program
-IFAC Technical Board Evolutions
+PhD Forum
 Chair: Example, Grace\tAnother University
 MoC13  Regular Session, Room 211\tAdd to My Program
 Model Predictive Control
@@ -60,6 +65,10 @@ Researcher, Robin\tResearch Institute
         self.assertEqual(len(day["sessions"]), 3)
         self.assertEqual(day["sessions"][0]["start"], "15:30")
         self.assertEqual(day["sessions"][1]["type"], "Forum")
+        self.assertEqual(day["sessions"][0]["title"], "Kwon Special Session")
+        self.assertEqual(day["sessions"][1]["title"], "PhD Forum")
+        self.assertNotIn("Kwon", {session["code"] for session in day["sessions"]})
+        self.assertNotIn("PhD", {session["code"] for session in day["sessions"]})
 
 
 if __name__ == "__main__":

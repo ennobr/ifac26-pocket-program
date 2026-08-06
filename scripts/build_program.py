@@ -91,7 +91,10 @@ def parse_day(text: str, source: dict, validate: bool = True) -> dict:
 
         without_action = clean(re.sub(r"\s*Add to My Program.*$", "", line))
         session_match = SESSION_RE.match(without_action)
-        if session_match:
+        # Real PaperCept session rows always include a comma followed by a room.
+        # A title such as "Kwon Special Session" or "PhD Forum" can otherwise
+        # look like a new session and split the actual program item in two.
+        if session_match and session_match.group(3):
             finish_session()
             session = {
                 "id": f"{source['date']}:{session_match.group(1)}",
@@ -171,7 +174,9 @@ def parse_day(text: str, source: dict, validate: bool = True) -> dict:
         ]
         if candidates:
             item["start"], item["end"] = Counter(candidates).most_common(1)[0][0]
-    sessions.sort(key=lambda item: (item["start"], item["room"], item["code"]))
+    sessions.sort(
+        key=lambda item: (item["start"] or "99:99", item["room"], item["code"])
+    )
     paper_count = sum(len(item["papers"]) for item in sessions)
     if validate and (len(sessions) < 20 or paper_count < 100):
         raise ValueError(
@@ -221,11 +226,7 @@ def atomic_json(path: Path, value: dict) -> None:
     temporary.replace(path)
 
 
-def build(source_dir: Path | None = None) -> dict:
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        downloaded = list(executor.map(lambda s: fetch_source(s, source_dir), SOURCES))
-
-    parsed = [parse_day(text, source) for source, text in downloaded]
+def write_program(parsed: list[dict]) -> dict:
     canonical = json.dumps(parsed, ensure_ascii=False, sort_keys=True).encode("utf-8")
     version = hashlib.sha256(canonical).hexdigest()[:16]
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -259,6 +260,14 @@ def build(source_dir: Path | None = None) -> dict:
         },
     )
     return program
+
+
+def build(source_dir: Path | None = None) -> dict:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        downloaded = list(executor.map(lambda s: fetch_source(s, source_dir), SOURCES))
+
+    parsed = [parse_day(text, source) for source, text in downloaded]
+    return write_program(parsed)
 
 
 def main() -> None:

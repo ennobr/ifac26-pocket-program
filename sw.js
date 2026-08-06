@@ -1,4 +1,4 @@
-const CACHE = "ifac26-pocket-v2";
+const CACHE = "ifac26-pocket-v3";
 const OFFLINE_ASSETS = [
   "./",
   "index.html",

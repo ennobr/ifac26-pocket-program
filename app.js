@@ -266,6 +266,16 @@ function renderTypeFilter() {
 function updateOverview(day, sessionCount) {
   const agenda = state.view === "agenda";
   const explore = state.view === "explore";
+  const timedSessions = day.sessions.filter((session) => session.start && session.end);
+  const earliest = timedSessions.reduce(
+    (value, session) => (!value || session.start < value ? session.start : value),
+    "",
+  );
+  const latest = timedSessions.reduce(
+    (value, session) => (!value || session.end > value ? session.end : value),
+    "",
+  );
+  const timeRange = earliest && latest ? `${earliest}–${latest}` : "Times to be confirmed";
   $("#overviewKicker").textContent = `${day.day.toUpperCase()} · ${formatDate(day.date, {
     month: "long",
     day: "numeric",
@@ -279,7 +289,7 @@ function updateOverview(day, sessionCount) {
     ? "A chronological plan with overlapping choices clearly marked."
     : explore
       ? `${sessionCount} matching ${sessionCount === 1 ? "session" : "sessions"} on ${day.day}`
-      : `${sessionCount} sessions · ${day.paperCount.toLocaleString()} papers · ${day.sessions[0]?.start || ""}–${day.sessions.at(-1)?.end || ""}`;
+      : `${sessionCount} sessions · ${day.paperCount.toLocaleString()} papers · ${timeRange}`;
   updateSavedCount();
 }
 
@@ -351,7 +361,11 @@ function getSavedEvents(dayFilter = null) {
       }
     }
   }
-  return events.sort((a, b) => `${a.day.date}${a.start}${a.title}`.localeCompare(`${b.day.date}${b.start}${b.title}`));
+  return events.sort((a, b) =>
+    `${a.day.date}${a.start || "99:99"}${a.title}`.localeCompare(
+      `${b.day.date}${b.start || "99:99"}${b.title}`,
+    ),
+  );
 }
 
 function matchesSearch(session) {
@@ -406,16 +420,17 @@ function renderSessions(day, sessions) {
     content.append(emptyState("No matching sessions", "Try a different phrase or session type."));
     return;
   }
-  let currentTime = "";
+  let currentTime = null;
   let group;
   for (const session of sessions) {
-    if (session.start !== currentTime) {
-      currentTime = session.start;
+    const timeKey = session.start || "TBA";
+    if (timeKey !== currentTime) {
+      currentTime = timeKey;
       group = createElement("section", "time-group");
       const heading = createElement("div", "time-heading");
       heading.append(
-        createElement("h3", "", currentTime),
-        createElement("span", "", timePeriod(currentTime)),
+        createElement("h3", "", timeKey === "TBA" ? "Time TBA" : timeKey),
+        createElement("span", "", timeKey === "TBA" ? "Special events" : timePeriod(timeKey)),
       );
       group.append(heading);
       content.append(group);
@@ -431,7 +446,11 @@ function sessionCard(day, session) {
   open.setAttribute("aria-label", `Open ${session.title}`);
   const meta = createElement("div", "session-meta");
   meta.append(
-    createElement("span", "session-time", `${session.start}–${session.end}`),
+    createElement(
+      "span",
+      "session-time",
+      session.start && session.end ? `${session.start}–${session.end}` : "Time TBA",
+    ),
     createElement("span", "room", session.room || "Room to be announced"),
   );
   const title = createElement("h3", "", session.title);
@@ -456,7 +475,8 @@ function sessionCard(day, session) {
 
 function openSession(day, session) {
   const dialog = $("#detailDialog");
-  $("#detailKicker").textContent = `${day.day} · ${session.start}–${session.end} · ${session.room}`;
+  const sessionTime = session.start && session.end ? `${session.start}–${session.end}` : "Time TBA";
+  $("#detailKicker").textContent = `${day.day} · ${sessionTime} · ${session.room}`;
   $("#detailTitle").textContent = session.title;
   const content = $("#detailContent");
   content.innerHTML = "";
@@ -586,7 +606,10 @@ function renderAgenda(day) {
   events.forEach((event) => {
     const card = createElement("article", `agenda-event${conflicts.has(event.id) ? " conflict" : ""}`);
     const time = createElement("div", "agenda-time");
-    time.append(createElement("strong", "", event.start), createElement("span", "", event.end));
+    time.append(
+      createElement("strong", "", event.start || "TBA"),
+      createElement("span", "", event.end || ""),
+    );
     const body = createElement("button", "agenda-open");
     body.type = "button";
     body.append(
@@ -611,6 +634,7 @@ function renderAgenda(day) {
 }
 
 function timeToMinutes(time) {
+  if (!/^\d{2}:\d{2}$/.test(time || "")) return null;
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 }
@@ -618,11 +642,17 @@ function timeToMinutes(time) {
 function conflictIds(events) {
   const result = new Set();
   for (let first = 0; first < events.length; first += 1) {
+    const firstStart = timeToMinutes(events[first].start);
+    const firstEnd = timeToMinutes(events[first].end);
+    if (firstStart === null || firstEnd === null) continue;
     for (let second = first + 1; second < events.length; second += 1) {
-      if (timeToMinutes(events[second].start) >= timeToMinutes(events[first].end)) break;
+      const secondStart = timeToMinutes(events[second].start);
+      const secondEnd = timeToMinutes(events[second].end);
+      if (secondStart === null || secondEnd === null) continue;
+      if (secondStart >= firstEnd) break;
       if (
-        timeToMinutes(events[first].start) < timeToMinutes(events[second].end) &&
-        timeToMinutes(events[second].start) < timeToMinutes(events[first].end)
+        firstStart < secondEnd &&
+        secondStart < firstEnd
       ) {
         result.add(events[first].id);
         result.add(events[second].id);
@@ -637,13 +667,16 @@ function exportCalendar() {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//IFAC 2026 Pocket Program//EN", "CALSCALE:GREGORIAN"];
   events.forEach((event) => {
     const date = event.day.date.replaceAll("-", "");
-    const start = event.start.replace(":", "") + "00";
-    const end = event.end.replace(":", "") + "00";
+    const timing = event.start && event.end
+      ? [
+          `DTSTART;TZID=Asia/Seoul:${date}T${event.start.replace(":", "")}00`,
+          `DTEND;TZID=Asia/Seoul:${date}T${event.end.replace(":", "")}00`,
+        ]
+      : [`DTSTART;VALUE=DATE:${date}`];
     lines.push(
       "BEGIN:VEVENT",
       `UID:${event.id.replace(/[^a-zA-Z0-9.-]/g, "-")}@ifac26-pocket-program`,
-      `DTSTART;TZID=Asia/Seoul:${date}T${start}`,
-      `DTEND;TZID=Asia/Seoul:${date}T${end}`,
+      ...timing,
       `SUMMARY:${icsEscape(event.title)}`,
       `LOCATION:${icsEscape(event.session.room)}`,
       `DESCRIPTION:${icsEscape(`${event.session.code} · ${event.session.type}`)}`,
