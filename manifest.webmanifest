@@ -1,10 +1,14 @@
 {
+  "id": "./",
   "name": "IFAC 2026 Pocket Program",
   "short_name": "IFAC 2026",
+  "description": "Browse IFAC World Congress 2026 and build a personal offline schedule.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f4f6",
-  "theme_color": "#111827",
+  "background_color": "#eef3f7",
+  "theme_color": "#102a43",
+  "categories": ["education", "productivity", "events"],
   "icons": [
     {
       "src": "icon.svg",
